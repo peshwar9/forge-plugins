@@ -1,0 +1,15 @@
+{
+  "name": "forge-plugins",
+  "owner": {
+    "name": "GradTensor",
+    "url": "https://www.forgeprivate.com"
+  },
+  "description": "Plugins from the makers of Forge, a private workspace for confidential work.",
+  "plugins": [
+    {
+      "name": "forge-pii-scan",
+      "source": "./forge-pii-scan",
+      "description": "Find the personal information in a document before you share it. Reports what is there and where, never the values."
+    }
+  ]
+}

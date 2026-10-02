@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "forge-pii-scan": {
+      "type": "http",
+      "url": "https://www.forgeprivate.com/api/mcp/public"
+    }
+  }
+}

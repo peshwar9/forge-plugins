@@ -1,0 +1,23 @@
+{
+  "name": "forge-pii-scan",
+  "displayName": "PII Scan",
+  "version": "0.1.0",
+  "description": "Find the personal information in a document before you share it. Reports what is there and where, never the values themselves.",
+  "author": {
+    "name": "GradTensor",
+    "url": "https://www.forgeprivate.com"
+  },
+  "homepage": "https://www.forgeprivate.com",
+  "license": "MIT",
+  "keywords": [
+    "pii",
+    "privacy",
+    "redaction",
+    "documents",
+    "compliance"
+  ],
+  "documentationUrl": "https://www.forgeprivate.com/technical",
+  "privacyPolicyUrl": "https://www.forgeprivate.com/privacy",
+  "termsOfServiceUrl": "https://www.forgeprivate.com/terms",
+  "supportUrl": "https://www.forgeprivate.com/contact"
+}
