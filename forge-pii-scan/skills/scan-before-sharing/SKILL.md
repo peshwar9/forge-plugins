@@ -44,8 +44,13 @@ themselves, or to send a version with those sections taken out. Do not offer to 
 the document yourself by rewriting it: a model rewriting a document for privacy
 produces something nobody can verify, which is the problem this tool exists to avoid.
 
-## Region
+## Options
 
-The tool takes an optional `region`: `all` by default, `in` to narrow to Indian
-identifiers, `us` to United States ones. Narrowing reduces false positives when the
-user knows the document's origin. Leave it at `all` unless they say.
+`region` is `all` by default, `in` narrows to Indian identifiers, `us` to United States
+ones. Narrowing reduces false positives when the user knows where a document came from.
+Leave it at `all` unless they say.
+
+`detail` is `full` by default, which returns every finding with its line. Pass `summary`
+for counts alone when a document is long and the locations are not the point. Prefer
+`full`: the lines are what make the report actionable, and `summary` only tells somebody
+that a problem exists without saying where.
