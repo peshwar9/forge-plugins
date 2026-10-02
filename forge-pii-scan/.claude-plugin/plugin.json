@@ -1,7 +1,7 @@
 {
   "name": "forge-pii-scan",
-  "displayName": "PII Scan",
-  "version": "0.1.0",
+  "displayName": "Forge PII Scan",
+  "version": "0.1.1",
   "description": "Find the personal information in a document before you share it. Reports what is there and where, never the values themselves.",
   "author": {
     "name": "GradTensor",
