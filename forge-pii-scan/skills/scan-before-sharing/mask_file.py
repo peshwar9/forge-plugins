@@ -5,13 +5,19 @@ mask; this file only finds the text in the document and applies the tool's answe
 
     python mask_file.py extract IN            -> prints the segments to send to `redact`
     python mask_file.py apply IN OUT RESULT   -> writes the masked copy, prints a report
+    python mask_file.py replace IN OUT LIST   -> replaces strings the user approved
 
 RESULT is a JSON file holding the tool's structured result: spans, checks and whole.
+
+LIST is a JSON file of exact strings the user chose to mask, each with its token:
+[{"text": "Kavitha Raman", "replacement": "[NAME]"}, ...]. Nothing detects them here:
+the user approved each one, and every exact occurrence is replaced. These strings
+are never sent anywhere.
 
 Office files need lxml, which keeps the XML exactly as Office wrote it. PDF needs
 PyMuPDF (`pip install pymupdf`).
 
-Nothing here prints an identifier. Reports give segment numbers and kinds only.
+Nothing here prints an identifier. Reports give segment numbers, kinds and counts only.
 """
 
 import hashlib
@@ -143,9 +149,8 @@ def _apply_to_elements(ts, spans):
             t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
 
 
-def _apply_office(src, dst, kind, segments, result):
+def _apply_office(src, dst, kind, segments, edits):
     parts_re, para_tag, text_tag = FORMATS[kind]
-    edits = _plan(segments, result)
     report = {"masked_segments": 0, "skipped_segments": [], "links_removed": 0}
     with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
         for item in zin.infolist():
@@ -202,9 +207,8 @@ def _pdf_segments(path):
     return segments
 
 
-def _apply_pdf(src, dst, segments, result):
+def _apply_pdf(src, dst, segments, edits):
     import fitz
-    edits = _plan(segments, result)
     report = {"masked_segments": 0, "skipped_segments": [], "links_removed": 0, "not_found_on_page": []}
     with fitz.open(src) as doc:
         for k, edit in edits.items():
@@ -256,8 +260,41 @@ def _plan(segments, result):
 _plan.skipped = []
 
 
+def _plan_replacements(segments, items):
+    """Spans for every exact occurrence of each approved string, longest first.
+
+    Longest first, so that "Kavitha Raman" is replaced whole before "Kavitha" is
+    looked for, and an occurrence never overlaps one already taken. Link targets and
+    spreadsheet number cells are left out: names are not stored there.
+    """
+    order = sorted(
+        [n for n, i in enumerate(items) if i.get("text")], key=lambda n: -len(items[n]["text"])
+    )
+    counts = [0] * len(items)
+    plan = {}
+    for k, seg in enumerate(segments):
+        ref = seg[1]
+        if isinstance(ref, tuple) and ref[0] in ("rel", "v") or ref == "link":
+            continue
+        cps = list(seg[2])
+        taken = [False] * len(cps)
+        spans = []
+        for n in order:
+            item = items[n]
+            needle = list(item["text"])
+            for i in range(len(cps) - len(needle) + 1):
+                if cps[i:i + len(needle)] == needle and not any(taken[i:i + len(needle)]):
+                    spans.append({"start": i, "end": i + len(needle), "replacement": item["replacement"]})
+                    for j in range(i, i + len(needle)):
+                        taken[j] = True
+                    counts[n] += 1
+        if spans:
+            plan[k] = {"spans": spans, "whole": None}
+    return plan, [{"item": n, "replacement": items[n].get("replacement"), "count": counts[n]} for n in range(len(items))]
+
+
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("extract", "apply"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("extract", "apply", "replace"):
         sys.exit(__doc__)
     cmd, src = sys.argv[1], sys.argv[2]
     kind = kind_of(src)
@@ -265,11 +302,20 @@ def main():
     if cmd == "extract":
         print(json.dumps([s[2] for s in segments if CANDIDATE.search(s[2])], ensure_ascii=False))
         return
-    dst, result_path = sys.argv[3], sys.argv[4]
-    with open(result_path, encoding="utf-8") as f:
-        result = json.load(f)
-    report = _apply_pdf(src, dst, segments, result) if kind == "pdf" else _apply_office(src, dst, kind, segments, result)
+    dst, data_path = sys.argv[3], sys.argv[4]
+    with open(data_path, encoding="utf-8") as f:
+        data = json.load(f)
+    if cmd == "replace":
+        edits, found = _plan_replacements(segments, data)
+    else:
+        edits, found = _plan(segments, data), None
+    report = _apply_pdf(src, dst, segments, edits) if kind == "pdf" else _apply_office(src, dst, kind, segments, edits)
     report["skipped_segments"] = _plan.skipped
+    if found is not None:
+        # Counts per approved string, by its position in LIST, without echoing the
+        # string. A count of 0 means that form does not occur exactly, which is
+        # worth telling the user.
+        report["replaced"] = found
     print(json.dumps(report))
 
 

@@ -76,9 +76,11 @@ get it.
 In a PDF, the text under each black box is deleted, not just covered. Links whose
 address holds an identifier, such as a `mailto:` link, are removed.
 
-**Only the exactly matched identifiers are masked.** Names and addresses are
-reported, not masked, and a name in a sentence is neither found nor masked, so
-Claude will point out the ones it can see for you to remove.
+**The tools mask only the exactly matched identifiers.** Names and addresses are
+not something they can find reliably, so Claude reads the document, lists the
+names and addresses it sees, and asks you which to mask. Only the ones you approve
+are replaced, by exact match, in the same formatting-safe way. Because this step
+depends on Claude's reading, look over the result for any name it missed.
 
 Masking a file needs Claude to be able to run code. Supported: .docx, .pptx, .xlsx
 and .pdf with a text layer. A scanned PDF has no text to find.
