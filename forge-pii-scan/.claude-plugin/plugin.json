@@ -1,8 +1,8 @@
 {
   "name": "forge-pii-scan",
   "displayName": "Forge PII Scan",
-  "version": "0.1.1",
-  "description": "Find the personal information in a document before you share it. Reports what is there and where, never the values themselves.",
+  "version": "0.2.0",
+  "description": "Find and mask the personal information in a document before you share it. Masks Word, PowerPoint, Excel and PDF files in place, keeping their formatting. Never returns the values themselves.",
   "author": {
     "name": "GradTensor",
     "url": "https://www.forgeprivate.com"
@@ -11,10 +11,15 @@
   "license": "MIT",
   "keywords": [
     "pii",
+    "personal data",
     "privacy",
     "redaction",
-    "documents",
-    "compliance"
+    "data protection",
+    "dpdp",
+    "aadhaar",
+    "sensitive data",
+    "before sharing",
+    "documents"
   ],
   "documentationUrl": "https://www.forgeprivate.com/technical",
   "privacyPolicyUrl": "https://www.forgeprivate.com/privacy",

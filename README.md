@@ -4,16 +4,17 @@ Plugins for Claude, from [GradTensor](https://www.forgeprivate.com).
 
 ## forge-pii-scan
 
-Checks a document for personal information before you share it.
+Finds and masks the personal information in a document before you share it.
 
 You are about to attach a contract to a support ticket, send an export to a
 contractor, or publish a file as a sample. **What is actually in it?** Most people
 answer that by skimming, and skimming is how a payroll column or a taxpayer ID ends
 up somewhere it should not be.
 
-This adds one tool, `scan`. It reads the text and tells you what personal
-information is in it and where. It changes nothing, it needs no account, and it
-stores nothing.
+This adds two tools. `scan` tells you what personal information is in a document
+and where. `redact` masks it: you get back the same Word, PowerPoint, Excel or PDF
+file, with its formatting intact and the identifiers replaced by tokens such as
+`[EMAIL]`. Neither needs an account, and neither stores anything.
 
 ### Install
 
@@ -58,18 +59,35 @@ document appears in an error message.
 on line 12, not what the address is. That is the point: a report you can paste into
 a ticket without re-creating the problem you were checking for.
 
-### What it will not do
+### How masking works
 
-It will not produce a redacted copy by rewriting the document. A language model
-rewriting a file for privacy produces something nobody can verify, which is the
-problem this tool exists to avoid. If you need a redacted version, remove the
-identifiers yourself, or remove the sections that hold them.
+Masking never means Claude rewriting your document. A language model rewriting a
+file for privacy produces something nobody can verify, and it can change words it
+was not asked to touch.
+
+Instead, a small script in Claude's sandbox pulls the text out of your file and
+`redact` decides what to mask, using the same fixed rules as `scan`. The tool
+returns only positions and tokens, never the values. The script then makes those
+exact replacements inside the original file, which is why the formatting survives.
+Each paragraph carries a fingerprint, so a position is never applied to text that
+differs from what was checked, and the finished file is checked again before you
+get it.
+
+In a PDF, the text under each black box is deleted, not just covered. Links whose
+address holds an identifier, such as a `mailto:` link, are removed.
+
+**Only the exactly matched identifiers are masked.** Names and addresses are
+reported, not masked, and a name in a sentence is neither found nor masked, so
+Claude will point out the ones it can see for you to remove.
+
+Masking a file needs Claude to be able to run code. Supported: .docx, .pptx, .xlsx
+and .pdf with a text layer. A scanned PDF has no text to find.
 
 ## Who makes these
 
 [GradTensor](https://www.forgeprivate.com), who build Forge, a private workspace for
-confidential work. The detection engine behind `scan` is the one Forge uses on its
-own ingestion, exposed read-only and without an account.
+confidential work. The detection engine behind both tools is the one Forge uses on
+its own ingestion, exposed without an account.
 
 ## Licence
 

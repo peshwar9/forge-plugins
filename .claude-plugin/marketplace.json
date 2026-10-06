@@ -9,7 +9,7 @@
     {
       "name": "forge-pii-scan",
       "source": "./forge-pii-scan",
-      "description": "Find the personal information in a document before you share it. Reports what is there and where, never the values."
+      "description": "Find and mask the personal information in a document before you share it, keeping the file's formatting. Never returns the values."
     }
   ]
 }
