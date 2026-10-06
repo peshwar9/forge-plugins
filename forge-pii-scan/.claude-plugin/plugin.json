@@ -1,7 +1,7 @@
 {
   "name": "forge-pii-scan",
   "displayName": "Forge PII Scan",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Find and mask the personal information in a document before you share it. Masks Word, PowerPoint, Excel and PDF files in place, keeping their formatting, and masks the names and addresses you approve. Never returns the values themselves.",
   "author": {
     "name": "GradTensor",

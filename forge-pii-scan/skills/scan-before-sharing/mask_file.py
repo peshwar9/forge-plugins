@@ -36,13 +36,22 @@ W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+P = "http://schemas.openxmlformats.org/presentationml/2006/main"
+TC = "http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments"
+
+# Comment formats that hold their text directly in one element, with no paragraph
+# around it: Excel's threaded comments and PowerPoint's older comments. Each such
+# element is its own paragraph.
+SELF_CONTAINED = (f"{{{TC}}}text", f"{{{P}}}text")
 PKG_REL = "http://schemas.openxmlformats.org/package/2006/relationships"
 
 # Per format: which parts hold text, and which element is a paragraph and which holds text.
 FORMATS = {
     "docx": (re.compile(r"word/(document|header\d*|footer\d*|footnotes|endnotes|comments)\.xml$"), f"{{{W}}}p", f"{{{W}}}t"),
-    "pptx": (re.compile(r"ppt/(slides/slide|notesSlides/notesSlide)\d+\.xml$"), f"{{{A}}}p", f"{{{A}}}t"),
-    "xlsx": (re.compile(r"xl/(sharedStrings|worksheets/sheet\d+|comments\d*)\.xml$"), None, f"{{{S}}}t"),
+    # Comments are where people write what they would not put in a cell or on a slide,
+    # such as a personal email, so every comment format is included.
+    "pptx": (re.compile(r"ppt/(slides/slide\d+|notesSlides/notesSlide\d+|comments/\w+)\.xml$"), f"{{{A}}}p", f"{{{A}}}t"),
+    "xlsx": (re.compile(r"xl/(sharedStrings|worksheets/sheet\d+|comments\d*|comments/comment\d+|threadedComments/threadedComment\d+)\.xml$"), None, f"{{{S}}}t"),
 }
 
 
@@ -68,14 +77,23 @@ def _paragraphs(root, para_tag, text_tag):
     """
     owners = {}
     order = []
-    for t in root.iter(text_tag):
+    for t in root.iter(text_tag, *SELF_CONTAINED):
+        if t.tag in SELF_CONTAINED:
+            node = t
+            if node not in owners:
+                owners[node] = []
+                order.append(node)
+            owners[node].append(t)
+            continue
         node = t
         while node is not None:
             node = node.getparent()
             if node is None:
                 break
             tag = node.tag
-            if (para_tag and tag == para_tag) or (para_tag is None and tag in (f"{{{S}}}si", f"{{{S}}}is")):
+            # In a spreadsheet a shared string (si), an inline string (is) or a
+            # comment's text plays the part of a paragraph.
+            if (para_tag and tag == para_tag) or (para_tag is None and tag in (f"{{{S}}}si", f"{{{S}}}is", f"{{{S}}}text")):
                 break
             if para_tag is None and tag in (f"{{{S}}}rPh",):  # phonetic hints are not cell text
                 node = None
