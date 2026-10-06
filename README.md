@@ -85,6 +85,15 @@ depends on Claude's reading, look over the result for any name it missed.
 Masking a file needs Claude to be able to run code. Supported: .docx, .pptx, .xlsx
 and .pdf with a text layer. A scanned PDF has no text to find.
 
+### Using it from another assistant
+
+The tools are a standard MCP server at `https://www.forgeprivate.com/api/mcp/public`, so any
+assistant that connects to MCP servers can call `scan` and `redact`. To mask a file in
+place, the assistant also needs code execution: it can fetch the masking script with the
+`get_masking_script` tool, or as the `forge-pii-scan://mask_file.py` resource, check the
+SHA-256 that comes with it, and follow the usage in the tool's description. The skill in
+this plugin is how Claude learns that workflow; another assistant has to be told it.
+
 ## Who makes these
 
 [GradTensor](https://www.forgeprivate.com), who build Forge, a private workspace for
