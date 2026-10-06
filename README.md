@@ -32,7 +32,20 @@ claude mcp add --transport http forge-pii-scan https://www.forgeprivate.com/api/
 ### What it finds
 
 **Matched exactly**: email addresses, phone numbers, payment card numbers (Luhn
-checked), US Social Security numbers, Indian PANs and Aadhaar numbers.
+checked), US Social Security numbers, Indian PANs and Aadhaar numbers, and IBANs
+(checksum verified). Bank account numbers are matched when a label or a spreadsheet
+column header says what they are, such as "A/C No:" or "Bank A/C".
+
+### What you can ask
+
+Attach a file and ask in your own words, for example:
+
+- *"I need to share this payroll file with our auditor. Mask the personal details first."*
+- *"Mask the personal information in this deck, and the names too, except the CFO."*
+- *"Redact the personal details in this invoice before I forward it."*
+
+Claude masks the identifiers, lists the names and addresses it can see, asks which of
+them to mask, and gives you back the same file with its formatting intact.
 
 **Found through structure**: a table column headed Name and how many rows sit under
 it, a signature or notices block, a postcode, a labelled address field, and email

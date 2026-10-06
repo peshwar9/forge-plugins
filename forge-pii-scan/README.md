@@ -8,8 +8,8 @@ Claude's sandbox applies that to your Word, PowerPoint, Excel or PDF file so its
 formatting survives. Neither stores anything, and neither needs an account or
 credentials.
 
-Email addresses, phone numbers, payment cards, SSNs, PANs and Aadhaar numbers are
-matched exactly. Names and addresses are reported only where structure reveals them,
+Email addresses, phone numbers, payment cards, SSNs, PANs, Aadhaar numbers and IBANs
+are matched exactly, and bank account numbers where a label or column header says so. Names and addresses are reported only where structure reveals them,
 such as a table column headed Name, a signature block or a postcode, so a name written
 in a sentence is missed. The plugin says so every time it reports, because a scan
 people over-trust is worse than no scan.

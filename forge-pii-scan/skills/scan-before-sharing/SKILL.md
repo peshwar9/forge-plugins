@@ -1,6 +1,6 @@
 ---
 name: scan-before-sharing
-description: Find and mask personal information in a document or pasted text: email addresses, phone numbers, payment cards, US SSNs, Indian PAN and Aadhaar numbers, and names and addresses where the layout reveals them. Masks Word, PowerPoint, Excel and PDF files in place, keeping their formatting, and masks the names and addresses the user approves. Use when the user attaches or uploads a file likely to hold data about people, such as a CV, contract, invoice, customer or employee list, spreadsheet, support ticket, log or transcript; asks whether something is safe to share, send, upload or publish; asks to redact, mask or remove personal data; mentions DPDP or data protection; or asks Claude to email, attach or publish a document. Reports kinds and locations, never the values.
+description: Find and mask personal information in a document or pasted text: email addresses, phone numbers, payment cards, US SSNs, Indian PAN and Aadhaar numbers, IBANs, bank account numbers, and names and addresses where the layout reveals them. Masks Word, PowerPoint, Excel and PDF files in place, keeping their formatting, and masks the names and addresses the user approves. Use when the user attaches or uploads a file likely to hold data about people, such as a CV, contract, invoice, customer or employee list, spreadsheet, support ticket, log or transcript; asks whether something is safe to share, send, upload or publish; asks to redact, mask or remove personal data; mentions DPDP or data protection; or asks Claude to email, attach or publish a document. Reports kinds and locations, never the values.
 ---
 
 # Find and mask personal information
@@ -25,7 +25,10 @@ Offer once, and do not insist. Offer to mask after a scan finds something.
 ## What the tools cover, and what they do not
 
 Matched exactly, and masked by `redact`: email addresses, phone numbers, payment card
-numbers, US Social Security numbers, Indian PANs and Aadhaar numbers.
+numbers, US Social Security numbers, Indian PANs and Aadhaar numbers, and IBANs. Bank
+account numbers are masked when the text or a spreadsheet column header labels them,
+such as "A/C No:" or a column headed "Bank A/C", because a bare run of digits could be
+an order or invoice number.
 
 Found by `scan` **only where the document's structure reveals them**, and never masked
 by the tools: names and addresses, such as a table column headed Name, a signature or notices block,
@@ -62,10 +65,12 @@ This needs code execution. The masking script is `mask_file.py`, in the same fol
 as this file. Copy it into your working directory. Office files need `lxml`; PDFs need
 PyMuPDF (`pip install pymupdf` if it is missing).
 
-1. Run `python mask_file.py extract FILE`. It prints a JSON array of the segments that
-   could hold an identifier.
-2. Call `redact` with that array as `segments`, exactly as printed, in the same order.
-   Copy it character for character. Each masked segment comes back with a fingerprint,
+1. Run `python mask_file.py extract FILE`. It prints a JSON object with `segments`, the
+   text that could hold an identifier, and for spreadsheets `labels`, each cell's
+   column header.
+2. Call `redact` with `segments`, and `labels` when present, exactly as printed and in
+   the same order. Copy them character for character. The labels are what let a bank
+   account in a column headed "Bank A/C" be masked. Each masked segment comes back with a fingerprint,
    and the script refuses any segment whose text differs from the file's.
 3. Save the tool's structured result (`spans`, `checks`, `whole`) as `result.json`,
    then run `python mask_file.py apply FILE OUTPUT result.json`. Name the output after

@@ -3,7 +3,7 @@
 Used with the `redact` tool from the forge-pii-scan server. The tool decides what to
 mask; this file only finds the text in the document and applies the tool's answer.
 
-    python mask_file.py extract IN            -> prints the segments to send to `redact`
+    python mask_file.py extract IN            -> prints the segments (and labels) to send to `redact`
     python mask_file.py apply IN OUT RESULT   -> writes the masked copy, prints a report
     python mask_file.py replace IN OUT LIST   -> replaces strings the user approved
 
@@ -107,27 +107,92 @@ def _paragraphs(root, para_tag, text_tag):
     return [owners[p] for p in order]
 
 
+def _cell_col_row(ref):
+    m = re.match(r"([A-Z]+)(\d+)$", ref or "")
+    return (m.group(1), int(m.group(2))) if m else (None, None)
+
+
+def _sheet_labels(z):
+    """Column headers, so a cell can be read beside the header that says what it is.
+
+    A bank account is only masked when something labels it as one, and in a
+    spreadsheet that something is the header in row 1. Returns the header for each
+    value cell and inline string, keyed by sheet part and cell reference, and for
+    each shared string the header of every cell that uses it, when they all agree.
+    """
+    shared = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        root = etree.fromstring(z.read("xl/sharedStrings.xml"))
+        shared = ["".join(t.text or "" for t in si.iter(f"{{{S}}}t")) for si in root.iter(f"{{{S}}}si")]
+
+    def text_of(c):
+        if c.get("t") == "s":
+            v = c.find(f"{{{S}}}v")
+            try:
+                return shared[int(v.text)]
+            except (TypeError, ValueError, IndexError, AttributeError):
+                return None
+        if c.get("t") == "inlineStr":
+            return "".join(t.text or "" for t in c.iter(f"{{{S}}}t"))
+        return None
+
+    by_cell, si_labels = {}, {}
+    for name in z.namelist():
+        if not re.search(r"xl/worksheets/sheet\d+\.xml$", name):
+            continue
+        root = etree.fromstring(z.read(name))
+        headers = {}
+        cells = list(root.iter(f"{{{S}}}c"))
+        for c in cells:
+            col, row = _cell_col_row(c.get("r"))
+            if row == 1:
+                headers[col] = (text_of(c) or "").strip() or None
+        for c in cells:
+            col, row = _cell_col_row(c.get("r"))
+            if not row or row == 1:
+                continue
+            label = headers.get(col)
+            by_cell[(name, c.get("r"))] = label
+            if c.get("t") == "s":
+                try:
+                    si_labels.setdefault(int(c.find(f"{{{S}}}v").text), set()).add(label)
+                except (TypeError, ValueError, AttributeError):
+                    pass
+    si_label = {i: next(iter(ls)) for i, ls in si_labels.items() if len(ls) == 1}
+    return by_cell, si_label
+
+
 def _office_segments(path, kind):
     parts_re, para_tag, text_tag = FORMATS[kind]
-    segments = []  # (part, reference within the part, text)
+    segments = []  # (part, reference within the part, text, label)
     with zipfile.ZipFile(path) as z:
+        by_cell, si_label = _sheet_labels(z) if kind == "xlsx" else ({}, {})
         for name in sorted(z.namelist()):
             if not parts_re.search(name):
                 continue
             root = etree.fromstring(z.read(name))
+            is_sheet = kind == "xlsx" and "/worksheets/" in name
             for i, ts in enumerate(_paragraphs(root, para_tag, text_tag)):
-                segments.append((name, ("p", i), "".join(t.text or "" for t in ts)))
+                label = None
+                if kind == "xlsx" and name == "xl/sharedStrings.xml":
+                    label = si_label.get(i)
+                elif is_sheet:
+                    container = ts[0].getparent()
+                    while container is not None and container.tag != f"{{{S}}}c":
+                        container = container.getparent()
+                    label = by_cell.get((name, container.get("r"))) if container is not None else None
+                segments.append((name, ("p", i), "".join(t.text or "" for t in ts), label))
             # A phone or ID number typed into a spreadsheet as a number is stored as a
             # cell value, not as text, and would otherwise be missed.
             for i, c in enumerate(_value_cells(root)):
-                segments.append((name, ("v", i), c.find(f"{{{S}}}v").text or ""))
+                segments.append((name, ("v", i), c.find(f"{{{S}}}v").text or "", by_cell.get((name, c.get("r")))))
             # Link targets, such as mailto: addresses, are stored outside the text.
             rels = name.rsplit("/", 1)
             rels_name = f"{rels[0]}/_rels/{rels[1]}.rels"
             if rels_name in z.namelist():
                 for rel in etree.fromstring(z.read(rels_name)):
                     if rel.get("TargetMode") == "External":
-                        segments.append((rels_name, ("rel", rel.get("Id")), rel.get("Target") or ""))
+                        segments.append((rels_name, ("rel", rel.get("Id")), rel.get("Target") or "", None))
     return segments
 
 
@@ -218,10 +283,10 @@ def _pdf_segments(path):
     with fitz.open(path) as doc:
         for page in doc:
             for i, line in enumerate(page.get_text("text").split("\n")):
-                segments.append((page.number, i, line))
+                segments.append((page.number, i, line, None))
             for link in page.get_links():
                 if link.get("uri"):
-                    segments.append((page.number, "link", link["uri"]))
+                    segments.append((page.number, "link", link["uri"], None))
     return segments
 
 
@@ -230,7 +295,7 @@ def _apply_pdf(src, dst, segments, edits):
     report = {"masked_segments": 0, "skipped_segments": [], "links_removed": 0, "not_found_on_page": []}
     with fitz.open(src) as doc:
         for k, edit in edits.items():
-            page_no, idx, text = segments[k]
+            page_no, idx, text, _label = segments[k]
             page = doc[page_no]
             if idx == "link":
                 for link in page.get_links():
@@ -318,7 +383,13 @@ def main():
     kind = kind_of(src)
     segments = _pdf_segments(src) if kind == "pdf" else _office_segments(src, kind)
     if cmd == "extract":
-        print(json.dumps([s[2] for s in segments if CANDIDATE.search(s[2])], ensure_ascii=False))
+        # Labels go with the segments when there are any, so the call to `redact`
+        # can pass both. Only spreadsheets have them.
+        chosen = [s for s in segments if CANDIDATE.search(s[2])]
+        out = {"segments": [s[2] for s in chosen]}
+        if any(s[3] for s in chosen):
+            out["labels"] = [s[3] for s in chosen]
+        print(json.dumps(out, ensure_ascii=False))
         return
     dst, data_path = sys.argv[3], sys.argv[4]
     with open(data_path, encoding="utf-8") as f:
