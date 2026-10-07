@@ -1,8 +1,8 @@
 {
   "name": "forge-pii-scan",
   "displayName": "Forge PII Scan",
-  "version": "0.4.3",
-  "description": "Find and mask the personal information in a document before you share it. Masks Word, PowerPoint, Excel and PDF files in place, keeping their formatting, and masks the names and addresses you approve. Never returns the values themselves. Try: \"I need to share this payroll file with our auditor. Mask the personal details first.\" \"Mask the personal information in this deck, and the names too, except the CFO.\" \"Redact the personal details in this invoice before I forward it.\"",
+  "version": "0.4.4",
+  "description": "Find and mask the personal information in a document before you share it: emails, phone numbers, card and bank account numbers, patient and policy IDs, names, ages and dates of birth. Masks Word, PowerPoint, Excel and PDF files in place, keeping their formatting, and masks other names and addresses you approve. Never returns the values themselves. Try: \"I need to share this payroll file with our auditor. Mask the personal details first.\" \"Mask the personal information in this deck, and the names too, except the CFO.\" \"Redact the personal details in this invoice before I forward it.\"",
   "author": {
     "name": "GradTensor",
     "url": "https://www.forgeprivate.com"
