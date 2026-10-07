@@ -4,7 +4,7 @@ Used with the `redact` tool from the forge-pii-scan server. The tool decides wha
 mask; this file only finds the text in the document and applies the tool's answer.
 
     python mask_file.py extract IN            -> prints the segments (and labels) to send to `redact`
-    python mask_file.py apply IN OUT RESULT   -> writes the masked copy, prints a report
+    python mask_file.py apply IN OUT RESULT   -> writes the masked copy, checks it, prints a report
     python mask_file.py replace IN OUT LIST   -> replaces strings the user approved
 
 RESULT is a JSON file holding the tool's structured result: spans, checks and whole.
@@ -28,9 +28,17 @@ import zipfile
 
 from lxml import etree
 
-# Every identifier the tool masks contains a digit or an @, so a segment without
-# either cannot need masking and is not sent. That keeps the request small.
+# Which segments are sent to `redact`. Almost every identifier contains a digit or an
+# @. The exception is a labelled name, which is letters after "Name:", so a segment
+# is also sent when it, or the spreadsheet column it sits under, has a label word.
+# Anything else cannot need masking and is not sent, which keeps the request small.
 CANDIDATE = re.compile(r"[@\d]")
+LABEL_WORDS = re.compile(r"\b(?:name|age|dob|d\.o\.b|birth)\b", re.I)
+
+# Masked values shorter than this are not looked for in the output when it is
+# checked, because an age such as "45" also occurs in "45 mg" and would be reported
+# as left behind when it was not.
+MIN_CHECKED = 6
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -321,9 +329,35 @@ def _apply_pdf(src, dst, segments, edits):
 
 # ---------------------------------------------------------------- shared
 
+def _is_candidate(seg):
+    text, label = seg[2], seg[3]
+    return bool(CANDIDATE.search(text) or LABEL_WORDS.search(text) or (label and LABEL_WORDS.search(label)))
+
+
+def _sent(segments):
+    """The distinct candidate segments, in first-seen order, and where each one occurs.
+
+    A report's header repeats on every page, and a spreadsheet repeats values down a
+    column. Each distinct text, with its label, is sent once, and the answer is
+    applied to every place it occurs. On a 48-page lab report that is 52 segments
+    instead of 720, and the request is what the assistant has to write out, so it is
+    most of the time a masking takes.
+    """
+    order, where = [], {}
+    for k, seg in enumerate(segments):
+        if not _is_candidate(seg):
+            continue
+        key = (seg[2], seg[3])
+        if key not in where:
+            where[key] = []
+            order.append(key)
+        where[key].append(k)
+    return order, where
+
+
 def _plan(segments, result):
     """Match the tool's answer to the segments, refusing any whose fingerprint differs."""
-    candidates = [k for k, seg in enumerate(segments) if CANDIDATE.search(seg[2])]
+    order, where = _sent(segments)
     checks = {c["segment"]: c["sha256"] for c in result.get("checks", [])}
     edits = {}
     for c in result.get("spans", []):
@@ -332,11 +366,11 @@ def _plan(segments, result):
         edits.setdefault(w["segment"], {"spans": [], "whole": None})["whole"] = w["masked"]
     plan = {}
     for sent_index, edit in edits.items():
-        k = candidates[sent_index]
-        if checks.get(sent_index) != fingerprint(segments[k][2]):
+        if sent_index >= len(order) or checks.get(sent_index) != fingerprint(order[sent_index][0]):
             _plan.skipped.append(sent_index)
             continue
-        plan[k] = edit
+        for k in where[order[sent_index]]:
+            plan[k] = edit
     return plan
 
 
@@ -376,6 +410,32 @@ def _plan_replacements(segments, items):
     return plan, [{"item": n, "replacement": items[n].get("replacement"), "count": counts[n]} for n in range(len(items))]
 
 
+def _masked_values(segments, plan):
+    """What each edit removed, for checking the output. Never printed."""
+    values = []
+    for k, edit in plan.items():
+        text = segments[k][2]
+        if edit["whole"] is not None:
+            values.append(text)
+            continue
+        cps = list(text)
+        values.extend("".join(cps[s["start"]:s["end"]]) for s in edit["spans"])
+    return values
+
+
+def _verify(dst, kind, values):
+    """Look for every masked value in the finished file's text.
+
+    This replaces sending the whole file to `redact` a second time: the script knows
+    exactly what it removed, so it can look for it locally, and the assistant does
+    not have to write the document out again.
+    """
+    out = _pdf_segments(dst) if kind == "pdf" else _office_segments(dst, kind)
+    text = "\n".join(seg[2] for seg in out)
+    checked = [v for v in set(values) if len(v) >= MIN_CHECKED]
+    return {"checked": len(checked), "remaining": sum(1 for v in checked if v in text)}
+
+
 def main():
     if len(sys.argv) < 3 or sys.argv[1] not in ("extract", "apply", "replace"):
         sys.exit(__doc__)
@@ -385,10 +445,10 @@ def main():
     if cmd == "extract":
         # Labels go with the segments when there are any, so the call to `redact`
         # can pass both. Only spreadsheets have them.
-        chosen = [s for s in segments if CANDIDATE.search(s[2])]
-        out = {"segments": [s[2] for s in chosen]}
-        if any(s[3] for s in chosen):
-            out["labels"] = [s[3] for s in chosen]
+        order, _ = _sent(segments)
+        out = {"segments": [text for text, _label in order]}
+        if any(label for _text, label in order):
+            out["labels"] = [label for _text, label in order]
         print(json.dumps(out, ensure_ascii=False))
         return
     dst, data_path = sys.argv[3], sys.argv[4]
@@ -400,6 +460,17 @@ def main():
         edits, found = _plan(segments, data), None
     report = _apply_pdf(src, dst, segments, edits) if kind == "pdf" else _apply_office(src, dst, kind, segments, edits)
     report["skipped_segments"] = _plan.skipped
+    if cmd == "replace":
+        # Approved strings are checked whatever their length: the user chose each one.
+        out = _pdf_segments(dst) if kind == "pdf" else _office_segments(dst, kind)
+        text = "\n".join(seg[2] for seg in out)
+        approved = [i.get("text") for i in data if i.get("text")]
+        report["verified"] = {"checked": len(approved), "remaining": sum(1 for v in approved if v in text)}
+    else:
+        report["verified"] = _verify(dst, kind, _masked_values(segments, edits))
+    # One answer to "is it done". A skipped segment was never masked, so it has no
+    # value to look for and `remaining` alone would read as clean.
+    report["complete"] = not report["skipped_segments"] and report["verified"]["remaining"] == 0
     if found is not None:
         # Counts per approved string, by its position in LIST, without echoing the
         # string. A count of 0 means that form does not occur exactly, which is

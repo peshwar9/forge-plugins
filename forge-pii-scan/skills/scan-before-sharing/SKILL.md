@@ -71,7 +71,8 @@ PyMuPDF (`pip install pymupdf` if it is missing).
 
 1. Run `python mask_file.py extract FILE`. It prints a JSON object with `segments`, the
    text that could hold an identifier, and for spreadsheets `labels`, each cell's
-   column header.
+   column header. Each distinct text appears once, even when it repeats on every page,
+   so the list is usually much shorter than the document.
 2. Call `redact` with `segments`, and `labels` when present, exactly as printed and in
    the same order. Copy them character for character. The labels are what let a bank
    account in a column headed "Bank A/C" be masked. Each masked segment comes back with a fingerprint,
@@ -79,9 +80,11 @@ PyMuPDF (`pip install pymupdf` if it is missing).
 3. Save the tool's structured result (`spans`, `checks`, `whole`) as `result.json`,
    then run `python mask_file.py apply FILE OUTPUT result.json`. Name the output after
    the original, such as `contract-masked.docx`.
-4. **Check the output.** Run `extract` on it and call `redact` again. It should find
-   nothing to mask. If it finds something, usually a segment the script skipped because
-   its fingerprint did not match, apply that result to the output and check again.
+4. **Check the report.** `apply` checks the finished file itself, by looking for every
+   value it masked, and prints `"complete": true` when nothing was skipped and nothing
+   is left. Do not send the file to `redact` again to check it. If `complete` is false,
+   usually because a segment was skipped when its fingerprint did not match, run steps
+   1 to 3 again on the output file, which then holds only what is still to mask.
 5. Give the user the masked file, and report: how many identifiers of each kind were
    masked, any links that were removed because their address held an identifier, and
    what was not masked, as described above.
@@ -100,7 +103,8 @@ only the ones the user approves.
    every form a person is named by, such as "Kavitha Raman", "Kavitha" and
    "Ms Raman", because only exact matches are replaced. Use `[NAME]` for people and
    `[ADDRESS]` for addresses.
-3. Run `python mask_file.py replace MASKED OUTPUT names.json` on the masked copy.
+3. Run `python mask_file.py replace MASKED OUTPUT names.json` on the masked copy. Its
+   report also says `complete`, after checking that no approved string is left.
 4. The report gives a count for each item, by its position in the list. A count of 0
    means that form does not occur on its own, usually because a longer form already
    covered it. If a name you expected to replace shows 0, check how it is written in
