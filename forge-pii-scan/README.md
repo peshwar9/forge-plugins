@@ -9,7 +9,8 @@ formatting survives. Neither stores anything, and neither needs an account or
 credentials.
 
 Email addresses, phone numbers, payment cards, SSNs, PANs, Aadhaar numbers and IBANs
-are matched exactly, and bank account numbers where a label or column header says so. Names and addresses are reported only where structure reveals them,
+are matched exactly, and bank accounts, IDs, names, ages and dates of birth where a label
+or column header says so, such as "Patient ID:", "Name:" or "Age:". Names and addresses are reported only where structure reveals them,
 such as a table column headed Name, a signature block or a postcode, so a name written
 in a sentence is missed. The plugin says so every time it reports, because a scan
 people over-trust is worse than no scan.

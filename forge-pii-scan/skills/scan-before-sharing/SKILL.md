@@ -1,6 +1,6 @@
 ---
 name: scan-before-sharing
-description: Find and mask personal information in a document or pasted text: emails, phone numbers, payment cards, US SSNs, Indian PAN and Aadhaar numbers, IBANs, bank accounts, and the names and addresses the user approves. Masks Word, PowerPoint, Excel and PDF files in place, keeping their formatting. Use when the user attaches a file likely to hold data about people, such as a CV, contract, invoice, payroll or HR file, bank statement, customer list, spreadsheet, ticket, log or transcript; asks whether it is safe to share, send, upload or publish, or wants it ready for a vendor, client or auditor; asks to redact, mask, anonymise, de-identify, scrub or hide personal data; mentions GDPR, DPDP or data protection; or asks Claude to email, attach or publish a document. Never returns the values.
+description: Find and mask personal information in a document or pasted text: emails, phone numbers, payment cards, US SSNs, Indian PAN and Aadhaar numbers, IBANs, bank accounts, and the names and addresses the user approves. Masks Word, PowerPoint, Excel and PDF files in place, keeping their formatting. Use when the user attaches a file likely to hold data about people, such as a CV, contract, invoice, medical or lab report, payroll or HR file, bank statement, customer list, spreadsheet, ticket, log or transcript; asks whether it is safe to share, send, upload or publish, or wants it ready for a vendor, client or auditor; asks to redact, mask, anonymise, de-identify, scrub or hide personal data; mentions GDPR, DPDP or data protection; or asks Claude to email, attach or publish a document. Never returns the values.
 ---
 
 # Find and mask personal information
@@ -25,13 +25,17 @@ Offer once, and do not insist. Offer to mask after a scan finds something.
 ## What the tools cover, and what they do not
 
 Matched exactly, and masked by `redact`: email addresses, phone numbers, payment card
-numbers, US Social Security numbers, Indian PANs and Aadhaar numbers, and IBANs. Bank
-account numbers are masked when the text or a spreadsheet column header labels them,
-such as "A/C No:" or a column headed "Bank A/C", because a bare run of digits could be
-an order or invoice number.
+numbers, US Social Security numbers, Indian PANs and Aadhaar numbers, and IBANs.
 
-Found by `scan` **only where the document's structure reveals them**, and never masked
-by the tools: names and addresses, such as a table column headed Name, a signature or notices block,
+Masked when a label introduces them, in the text or as a spreadsheet column header:
+bank account numbers ("A/C No:", "Bank A/C"), IDs ("Patient ID:", "MRN:", "UHID:",
+"Report ID:", "Sample ID:", "Policy No:", "Claim No:", "Employee ID:"), names
+("Name:", "Patient Name:"), ages ("Age:") and dates of birth ("DOB:"). The label stays
+and only the value is replaced. A bare number is left alone, because it could be an
+order or invoice number, and invoice, order and PO numbers are never treated as IDs.
+
+Other names and addresses are found by `scan` **only where the document's structure
+reveals them**, and are not masked by the tools: such as a table column headed Name, a signature or notices block,
 a postcode, a labelled address field, or an email address that embeds somebody's name.
 **A name written in an ordinary sentence is neither found nor masked.**
 
@@ -84,8 +88,9 @@ PyMuPDF (`pip install pymupdf` if it is missing).
 
 ### Names and addresses, when the user chooses them
 
-The tools never find or mask names and addresses. You can, but only for ones the user
-approves.
+The tools mask names only after a "Name:" label. Every other name and address, such as
+one in a sentence, a table cell or a signature line without a label, you can mask, but
+only the ones the user approves.
 
 1. After masking, list the names and addresses you can see, with where each appears,
    and ask which to mask. Suggest keeping what the recipient may need, such as the
@@ -112,6 +117,11 @@ say so rather than reporting that it is clean.
 
 The document's own properties, such as its author, are not changed. Mention them if
 the user is anonymising a file.
+
+For a medical, legal or HR document, say that the substance stays: the diagnosis, the
+test results, the case or the salary. Masking the identifiers makes the document harder
+to link to a person; it does not make it anonymous. Age, gender and dates together can
+still narrow down who someone is.
 
 Other formats, such as .doc, .odt or images, are not supported. Say so, and offer to
 mask the text instead.

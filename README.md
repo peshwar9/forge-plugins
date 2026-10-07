@@ -33,8 +33,10 @@ claude mcp add --transport http forge-pii-scan https://www.forgeprivate.com/api/
 
 **Matched exactly**: email addresses, phone numbers, payment card numbers (Luhn
 checked), US Social Security numbers, Indian PANs and Aadhaar numbers, and IBANs
-(checksum verified). Bank account numbers are matched when a label or a spreadsheet
-column header says what they are, such as "A/C No:" or "Bank A/C".
+(checksum verified). Bank account numbers, IDs, names, ages and dates of birth are
+matched when a label or a spreadsheet column header says what they are, such as "A/C No:",
+"Patient ID:", "Policy No:", "Name:", "Age:" or "DOB:". Invoice, order and PO numbers are
+left alone.
 
 ### What you can ask
 
